@@ -3,15 +3,25 @@ spring:
     stream:
       bindings:
         process-in-0:
-          destination: trx-topic
+          destination: input-topic
         process-out-0:
-          destination: customer-topic
+          destination: output-topic
       kafka:
         streams:
           binder:
             brokers: ${spring.embedded.kafka.brokers}
             configuration:
               commit.interval.ms: 100
-              default:
-                key.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
-                value.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+#            default:
+#              key.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+#              value.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+
+
+#          binding:
+#            process-in-0:
+#              consumer:
+#                valueSerde: io.confluent.kafka.streams.serdes.json.KafkaJsonSchemaSerde
+#            process-out-0:
+#              producer:
+#                valueSerde: io.confluent.kafka.streams.serdes.json.KafkaJsonSchemaSerde
+

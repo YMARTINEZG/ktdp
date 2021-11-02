@@ -5,17 +5,14 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.producer.Producer;
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.junit.*;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.kafka.config.StreamsBuilderFactoryBean;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -24,13 +21,14 @@ import org.springframework.kafka.test.rule.EmbeddedKafkaRule;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit4.SpringRunner;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.kafka.test.utils.KafkaTestUtils.*;
 
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import static org.junit.Assert.assertEquals;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.kafka.test.utils.KafkaTestUtils.consumerProps;
+import static org.springframework.kafka.test.utils.KafkaTestUtils.getRecords;
 
 @Log4j2
 @RunWith(SpringRunner.class)
@@ -40,23 +38,21 @@ import static org.junit.Assert.assertEquals;
         properties = {"server.port=0"}
 )
 public class MainServiceTest {
-    public static String INPUT_TOPIC = "trx-topic";
-    public static String OUTPUT_TOPIC = "customer-topic";
+    static final String INPUT_TOPIC = "input-topic";
+    static final String OUTPUT_TOPIC = "output-topic";
+    private static final String GROUP_NAME = "group-test";
 
     @ClassRule
-    public static EmbeddedKafkaRule embeddedKafkaRule = new EmbeddedKafkaRule(1, true, 1,
+    public static EmbeddedKafkaRule embeddedKafkaRule = new EmbeddedKafkaRule(1, false, 1,
             INPUT_TOPIC, OUTPUT_TOPIC);
+
     private static final EmbeddedKafkaBroker embeddedKafka = embeddedKafkaRule.getEmbeddedKafka();
 
-    private static KafkaTemplate<String, String> template;
-
-    @Autowired
-    StreamsBuilderFactoryBean streamsBuilderFactoryBean;
-
-    private static Consumer<String, String> consumer;
+    public static KafkaTemplate<String, String> template;
+    public static Consumer<String, String> consumer;
 
     @BeforeClass
-    public static void setUp(){
+    public static void setUp() {
 
         System.setProperty("spring.kafka.bootstrap-servers", embeddedKafka.getBrokersAsString());
 
@@ -67,19 +63,18 @@ public class MainServiceTest {
         template = new KafkaTemplate<>(pf, true);
 
 
-        Map<String, Object> consumerProps = consumerProps("group", "false", embeddedKafka);
+        Map<String, Object> consumerProps = consumerProps(GROUP_NAME, "false", embeddedKafka);
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         DefaultKafkaConsumerFactory<String, String> cf = new DefaultKafkaConsumerFactory<>(consumerProps);
         consumer = cf.createConsumer();
         embeddedKafka.consumeFromAnEmbeddedTopic(consumer, OUTPUT_TOPIC);
+
     }
     @AfterClass
     public static void tearDown(){
-        if (consumer != null) {
-            consumer.close();
-        }
+        consumer.close();
     }
 
     @Test
@@ -109,9 +104,12 @@ public class MainServiceTest {
     public void singleEventProducerTest() {
         template.send(INPUT_TOPIC, "key1", "this is a test world");
 
-        ConsumerRecord<String, String> record = KafkaTestUtils.getSingleRecord(consumer, OUTPUT_TOPIC);
+        ConsumerRecord<String, String> singleRecord = KafkaTestUtils.getSingleRecord(consumer, OUTPUT_TOPIC);
 
-        assertEquals(record.value(), "THIS IS A TEST WORLD");
+        assertThat(singleRecord).isNotNull();
+        assertThat(singleRecord.key()).isEqualTo("key1");
+        assertThat(singleRecord.value()).isEqualTo("THIS IS A TEST WORLD");
+
     }
 
 }
